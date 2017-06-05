@@ -1,0 +1,6 @@
+[package]
+name = "simple-rust-stack-interp"
+version = "0.1.0"
+authors = ["Edd Barrett <vext01@gmail.com>"]
+
+[dependencies]
