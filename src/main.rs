@@ -6,12 +6,14 @@ use std::io::{BufReader, BufRead};
 use std::process::exit;
 
 type Program = Vec<Instr>;
-type LabelMap = HashMap<String, i32>;
+type LabelMap = HashMap<String, usize>;
+type RawNumber = i32;
 
 struct Interp {
     program: Program,
     labels: LabelMap,
     stack: Vec<StackVal>,
+    pc: usize,
 }
 
 impl Interp {
@@ -21,6 +23,7 @@ impl Interp {
             program: program,
             labels: labels,
             stack: vec![],
+            pc: 0,
         }
     }
 
@@ -53,7 +56,7 @@ impl Interp {
             "add" => Instr::Add,
             "print" => Instr::Print,
             _ => {
-                let num = line.parse::<i32>();
+                let num = line.parse::<RawNumber>();
                 if num.is_err() {
                     return Err(());
                 }
@@ -64,9 +67,56 @@ impl Interp {
         Ok(rv)
     }
 
-    fn run(&mut self) {}
+    fn push(&mut self, val: StackVal) {
+        self.stack.push(val);
+    }
+
+    fn pop(&mut self) -> StackVal {
+        let val = self.stack.pop();
+        if val.is_none() {
+            Self::fatal("stack underflow");
+        }
+        val.unwrap()
+    }
+
+    fn pop_number(&mut self) -> RawNumber {
+        let item = self.pop();
+        let rv = match item {
+            StackVal::Number(val) => val,
+            _ => {
+                Self::fatal("type mismatch");
+                unreachable!();
+            }
+        };
+        rv
+    }
+
+    fn run(&mut self) {
+        // main interpreter loop
+        let program: Vec<Instr> = self.program.iter().cloned().collect();
+        loop {
+            let instr = program.get(self.pc);
+            if instr.is_none() {
+                return; // end of program
+            }
+
+            match instr.unwrap() {
+                &Instr::Push(ref val) => {
+                    self.push(val.clone());
+                    self.pc += 1;
+                }
+                &Instr::Add => {
+                    let (arg1, arg2) = (self.pop_number(), self.pop_number());
+                    self.push(StackVal::Number(arg1 + arg2));
+                    self.pc += 1;
+                }
+                _ => Self::fatal("Not implemented"),
+            }
+        }
+    }
 }
 
+#[derive(Clone)]
 enum Instr {
     Push(StackVal),
     Pop,
@@ -76,8 +126,9 @@ enum Instr {
     Print,
 }
 
+#[derive(Clone)]
 enum StackVal {
-    Number(i32),
+    Number(RawNumber),
 }
 
 fn main() {
