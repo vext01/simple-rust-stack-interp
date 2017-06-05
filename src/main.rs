@@ -1,9 +1,12 @@
 #![allow(warnings)]
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, BufRead};
+use std::process::exit;
 
 type Program = Vec<Instr>;
-type LabelMap = HashMap<String, u32>;
+type LabelMap = HashMap<String, i32>;
 
 struct Interp {
     program: Program,
@@ -21,8 +24,44 @@ impl Interp {
         }
     }
 
+    fn fatal(msg: &str) {
+        println!("FATAL: {}", msg);
+        exit(1);
+    }
+
     fn parse(filename: &str) -> (Program, LabelMap) {
+        let fh = File::open(filename);
+        if fh.is_err() {
+            Self::fatal(&format!("Failed to open input file: {}", filename));
+        }
+        let fh = fh.unwrap();
+
+        let reader = BufReader::new(fh);
+        let mut program = Program::new();
+        for line in reader.lines() {
+            match Self::parse_line(line.unwrap()) {
+                Ok(instr) => program.push(instr),
+                Err(_) => Self::fatal("parse error"),
+            }
+        }
         (vec![], LabelMap::new())
+    }
+
+    fn parse_line(line: String) -> Result<Instr, ()> {
+        let line = line.trim();
+        let rv = match line {
+            "add" => Instr::Add,
+            "print" => Instr::Print,
+            _ => {
+                let num = line.parse::<i32>();
+                if num.is_err() {
+                    return Err(());
+                }
+                let num = num.unwrap();
+                Instr::Push(StackVal::Number(num))
+            }
+        };
+        Ok(rv)
     }
 
     fn run(&mut self) {}
@@ -38,7 +77,7 @@ enum Instr {
 }
 
 enum StackVal {
-    Number(u32),
+    Number(i32),
 }
 
 fn main() {
