@@ -1,0 +1,8 @@
+push 5
+loop:
+dup
+print
+push 1
+sub
+dup
+jne 0 loop
