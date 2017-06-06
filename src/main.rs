@@ -98,6 +98,9 @@ impl Interp {
                 }
                 _ => {
                     if opcode.ends_with(":") {
+                        // XXX in a real interpreter you would resolve the labels to addresses
+                        // ahead of time so that: a) a bad label is compile-time detected, and b)
+                        // you don't have to repeatedly look them up.
                         ParsedLine::Label(opcode[..opcode.len() - 1].to_owned())
                     } else {
                         Self::fatal("parse error: unknown opcode");
@@ -171,6 +174,7 @@ impl Interp {
                     let _ = self.pop();
                     self.pc += 1;
                 }
+                // XXX generalise binary operations to reduce duplication
                 &Instr::JumpNotEqual(ref cmp_val, ref label) => {
                     let val = self.pop_number();
                     if val != *cmp_val {
