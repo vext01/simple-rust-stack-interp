@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::process::exit;
+use std::env;
 
 type Program = Vec<Instr>;
 type LabelMap = HashMap<String, usize>;
@@ -230,6 +231,11 @@ enum StackVal {
 }
 
 fn main() {
-    let mut interp = Interp::new("test.iin");
-    interp.run();
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        Interp::fatal("usage: simple-rust-stack-interp <file>");
+    } else {
+        let mut interp = Interp::new(&args[1]);
+        interp.run();
+    }
 }
