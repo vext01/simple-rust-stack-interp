@@ -93,7 +93,7 @@ impl Interp {
 
     fn run(&mut self) {
         // main interpreter loop
-        let program: Vec<Instr> = self.program.iter().cloned().collect();
+        let program: Vec<Instr> = self.program.to_owned();
         loop {
             let instr = program.get(self.pc);
             if instr.is_none() {
