@@ -137,48 +137,50 @@ impl Interp {
 
     fn run(&mut self) {
         // main interpreter loop
-        let program: Vec<Instr> = self.program.to_owned();
         loop {
-            let instr = program.get(self.pc);
-            if instr.is_none() {
-                return; // end of program
-            }
+            let instr = {
+                let instr = self.program.get(self.pc);
+                if instr.is_none() {
+                    return; // end of program
+                }
+                instr.unwrap().clone()
+            };
 
-            match instr.unwrap() {
-                &Instr::Push(ref val) => {
+            match instr {
+                Instr::Push(val) => {
                     self.push(val.clone());
                     self.pc += 1;
                 }
-                &Instr::Add => {
+                Instr::Add => {
                     let (arg1, arg2) = (self.pop_number(), self.pop_number());
                     self.push(StackVal::Number(arg1 + arg2));
                     self.pc += 1;
                 }
-                &Instr::Dup => {
+                Instr::Dup => {
                     let val = self.pop();
                     self.push(val.clone());
                     self.push(val);
                     self.pc += 1;
                 }
-                &Instr::Sub => {
+                Instr::Sub => {
                     let (arg1, arg2) = (self.pop_number(), self.pop_number());
                     self.push(StackVal::Number(arg2 - arg1));
                     self.pc += 1;
                 }
-                &Instr::Print => {
+                Instr::Print => {
                     let arg = self.pop_number();
                     println!("{}", arg);
                     self.pc += 1;
                 }
-                &Instr::Pop => {
+                Instr::Pop => {
                     let _ = self.pop();
                     self.pc += 1;
                 }
                 // XXX generalise binary operations to reduce duplication
-                &Instr::JumpNotEqual(ref cmp_val, ref label) => {
+                Instr::JumpNotEqual(cmp_val, label) => {
                     let val = self.pop_number();
-                    if val != *cmp_val {
-                        if let Some(addr) = self.labels.get(label) {
+                    if val != cmp_val {
+                        if let Some(addr) = self.labels.get(&label) {
                             self.pc = *addr;
                         } else {
                             Self::fatal("undefined label");
@@ -187,10 +189,10 @@ impl Interp {
                         self.pc += 1;
                     }
                 }
-                &Instr::JumpEqual(ref cmp_val, ref label) => {
+                Instr::JumpEqual(cmp_val, label) => {
                     let val = self.pop_number();
-                    if val == *cmp_val {
-                        if let Some(addr) = self.labels.get(label) {
+                    if val == cmp_val {
+                        if let Some(addr) = self.labels.get(&label) {
                             self.pc = *addr;
                         } else {
                             Self::fatal("undefined label");
