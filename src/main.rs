@@ -8,6 +8,7 @@ use std::process::exit;
 type Program = Vec<Instr>;
 type LabelMap = HashMap<String, usize>;
 type RawNumber = i32;
+type LabelName = String;
 
 struct Interp {
     program: Program,
@@ -47,21 +48,50 @@ impl Interp {
                 Err(_) => Self::fatal("parse error"),
             }
         }
-        (vec![], LabelMap::new())
+        (program, LabelMap::new())
+    }
+
+    fn parse_number<'a>(s: &'a str) -> RawNumber {
+        let num = s.parse::<RawNumber>();
+        if num.is_err() {
+            Self::fatal("parse error: unparsed number");
+            unreachable!();
+        }
+        num.unwrap()
     }
 
     fn parse_line(line: String) -> Result<Instr, ()> {
         let line = line.trim();
-        let rv = match line {
-            "add" => Instr::Add,
-            "print" => Instr::Print,
-            _ => {
-                let num = line.parse::<RawNumber>();
-                if num.is_err() {
-                    return Err(());
+        let mut operands = line.split(" ").map(|x| x.trim());
+
+        let mut next_operand = || {
+            match operands.next() {
+                Some(s) => s.trim(),
+                None => {
+                    Self::fatal("parse error: too few arguments");
+                    unreachable!();
                 }
-                let num = num.unwrap();
-                Instr::Push(StackVal::Number(num))
+            }
+        };
+
+        let opcode = next_operand();
+        let rv = match opcode {
+            "add" => Instr::Add,
+            "sub" => Instr::Sub,
+            "print" => Instr::Print,
+            "pop" => Instr::Pop,
+            "je" => {
+                let cmp_val = Self::parse_number(next_operand());
+                let target = next_operand();
+                Instr::JumpEqual(cmp_val, String::from(target))
+            },
+            "push" => {
+                let val = Self::parse_number(next_operand());
+                Instr::Push(StackVal::Number(val))
+            },
+            _ => {
+                Self::fatal("Parse error");
+                unreachable!();
             }
         };
         Ok(rv)
@@ -83,10 +113,6 @@ impl Interp {
         let item = self.pop();
         let rv = match item {
             StackVal::Number(val) => val,
-            _ => {
-                Self::fatal("type mismatch");
-                unreachable!();
-            }
         };
         rv
     }
@@ -109,7 +135,21 @@ impl Interp {
                     let (arg1, arg2) = (self.pop_number(), self.pop_number());
                     self.push(StackVal::Number(arg1 + arg2));
                     self.pc += 1;
-                }
+                },
+                &Instr::Sub => {
+                    let (arg1, arg2) = (self.pop_number(), self.pop_number());
+                    self.push(StackVal::Number(arg1 - arg2));
+                    self.pc += 1;
+                },
+                &Instr::Print => {
+                    let arg = self.pop_number();
+                    println!("{}", arg);
+                    self.pc += 1;
+                },
+                &Instr::Pop => {
+                    let _ = self.pop();
+                    self.pc += 1;
+                },
                 _ => Self::fatal("Not implemented"),
             }
         }
@@ -122,7 +162,7 @@ enum Instr {
     Pop,
     Add,
     Sub,
-    JumpEqual,
+    JumpEqual(RawNumber, LabelName),  // jump to .1 if top of stack == .0
     Print,
 }
 
