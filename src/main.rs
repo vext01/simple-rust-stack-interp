@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
@@ -34,21 +32,27 @@ impl Interp {
     }
 
     fn parse(filename: &str) -> (Program, LabelMap) {
+        // Get ready to iterate over the source program
         let fh = File::open(filename);
         if fh.is_err() {
             Self::fatal(&format!("Failed to open input file: {}", filename));
         }
         let fh = fh.unwrap();
-
         let reader = BufReader::new(fh);
+
         let mut program = Program::new();
+        let mut labels = LabelMap::new();
         for line in reader.lines() {
             match Self::parse_line(line.unwrap()) {
-                Ok(instr) => program.push(instr),
-                Err(_) => Self::fatal("parse error"),
+                ParsedLine::Instr(instr) => program.push(instr),
+                ParsedLine::Label(label) => {
+                    if labels.insert(label, program.len()).is_some() {
+                        Self::fatal("parse error: duplicate label");
+                    }
+                }
             }
         }
-        (program, LabelMap::new())
+        (program, labels)
     }
 
     fn parse_number<'a>(s: &'a str) -> RawNumber {
@@ -59,7 +63,7 @@ impl Interp {
         num.unwrap()
     }
 
-    fn parse_line(line: String) -> Result<Instr, ()> {
+    fn parse_line(line: String) -> ParsedLine {
         let line = line.trim();
         let mut operands = line.split(" ").map(|x| x.trim());
 
@@ -73,24 +77,34 @@ impl Interp {
 
             let opcode = next_operand();
             let rv = match opcode {
-                "add" => Instr::Add,
-                "sub" => Instr::Sub,
-                "print" => Instr::Print,
-                "pop" => Instr::Pop,
+                "add" => ParsedLine::Instr(Instr::Add),
+                "sub" => ParsedLine::Instr(Instr::Sub),
+                "print" => ParsedLine::Instr(Instr::Print),
+                "pop" => ParsedLine::Instr(Instr::Pop),
+                "dup" => ParsedLine::Instr(Instr::Dup),
                 "je" => {
                     let cmp_val = Self::parse_number(next_operand());
                     let target = next_operand();
-                    Instr::JumpEqual(cmp_val, String::from(target))
+                    ParsedLine::Instr(Instr::JumpEqual(cmp_val, String::from(target)))
+                }
+                "jne" => {
+                    let cmp_val = Self::parse_number(next_operand());
+                    let target = next_operand();
+                    ParsedLine::Instr(Instr::JumpNotEqual(cmp_val, String::from(target)))
                 }
                 "push" => {
                     let val = Self::parse_number(next_operand());
-                    Instr::Push(StackVal::Number(val))
+                    ParsedLine::Instr(Instr::Push(StackVal::Number(val)))
                 }
                 _ => {
-                    Self::fatal("parse error: unknown opcode");
+                    if opcode.ends_with(":") {
+                        ParsedLine::Label(opcode[..opcode.len() - 1].to_owned())
+                    } else {
+                        Self::fatal("parse error: unknown opcode");
+                    }
                 }
             };
-            Ok(rv)
+            rv
         };
         if operands.next().is_some() {
             Self::fatal("parse error: too many operands");
@@ -137,9 +151,15 @@ impl Interp {
                     self.push(StackVal::Number(arg1 + arg2));
                     self.pc += 1;
                 }
+                &Instr::Dup => {
+                    let val = self.pop();
+                    self.push(val.clone());
+                    self.push(val);
+                    self.pc += 1;
+                }
                 &Instr::Sub => {
                     let (arg1, arg2) = (self.pop_number(), self.pop_number());
-                    self.push(StackVal::Number(arg1 - arg2));
+                    self.push(StackVal::Number(arg2 - arg1));
                     self.pc += 1;
                 }
                 &Instr::Print => {
@@ -151,7 +171,30 @@ impl Interp {
                     let _ = self.pop();
                     self.pc += 1;
                 }
-                _ => Self::fatal("Not implemented"),
+                &Instr::JumpNotEqual(ref cmp_val, ref label) => {
+                    let val = self.pop_number();
+                    if val != *cmp_val {
+                        if let Some(addr) = self.labels.get(label) {
+                            self.pc = *addr;
+                        } else {
+                            Self::fatal("undefined label");
+                        }
+                    } else {
+                        self.pc += 1;
+                    }
+                }
+                &Instr::JumpEqual(ref cmp_val, ref label) => {
+                    let val = self.pop_number();
+                    if val == *cmp_val {
+                        if let Some(addr) = self.labels.get(label) {
+                            self.pc = *addr;
+                        } else {
+                            Self::fatal("undefined label");
+                        }
+                    } else {
+                        self.pc += 1;
+                    }
+                }
             }
         }
     }
@@ -162,9 +205,17 @@ enum Instr {
     Push(StackVal),
     Pop,
     Add,
+    Dup,
     Sub,
     JumpEqual(RawNumber, LabelName), // jump to .1 if top of stack == .0
+    JumpNotEqual(RawNumber, LabelName), // jump to .1 if top of stack != .0
     Print,
+}
+
+#[derive(Clone)]
+enum ParsedLine {
+    Label(LabelName),
+    Instr(Instr),
 }
 
 #[derive(Clone)]
