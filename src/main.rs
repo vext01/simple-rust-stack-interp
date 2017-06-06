@@ -28,7 +28,7 @@ impl Interp {
         }
     }
 
-    fn fatal(msg: &str) {
+    fn fatal(msg: &str) -> ! {
         println!("FATAL: {}", msg);
         exit(1);
     }
@@ -55,7 +55,6 @@ impl Interp {
         let num = s.parse::<RawNumber>();
         if num.is_err() {
             Self::fatal("parse error: unparsed number");
-            unreachable!();
         }
         num.unwrap()
     }
@@ -64,37 +63,39 @@ impl Interp {
         let line = line.trim();
         let mut operands = line.split(" ").map(|x| x.trim());
 
-        let mut next_operand = || {
-            match operands.next() {
+        let rv = {
+            let mut next_operand = || match operands.next() {
                 Some(s) => s.trim(),
                 None => {
                     Self::fatal("parse error: too few arguments");
-                    unreachable!();
                 }
-            }
-        };
+            };
 
-        let opcode = next_operand();
-        let rv = match opcode {
-            "add" => Instr::Add,
-            "sub" => Instr::Sub,
-            "print" => Instr::Print,
-            "pop" => Instr::Pop,
-            "je" => {
-                let cmp_val = Self::parse_number(next_operand());
-                let target = next_operand();
-                Instr::JumpEqual(cmp_val, String::from(target))
-            },
-            "push" => {
-                let val = Self::parse_number(next_operand());
-                Instr::Push(StackVal::Number(val))
-            },
-            _ => {
-                Self::fatal("Parse error");
-                unreachable!();
-            }
+            let opcode = next_operand();
+            let rv = match opcode {
+                "add" => Instr::Add,
+                "sub" => Instr::Sub,
+                "print" => Instr::Print,
+                "pop" => Instr::Pop,
+                "je" => {
+                    let cmp_val = Self::parse_number(next_operand());
+                    let target = next_operand();
+                    Instr::JumpEqual(cmp_val, String::from(target))
+                }
+                "push" => {
+                    let val = Self::parse_number(next_operand());
+                    Instr::Push(StackVal::Number(val))
+                }
+                _ => {
+                    Self::fatal("parse error: unknown opcode");
+                }
+            };
+            Ok(rv)
         };
-        Ok(rv)
+        if operands.next().is_some() {
+            Self::fatal("parse error: too many operands");
+        }
+        rv
     }
 
     fn push(&mut self, val: StackVal) {
@@ -135,21 +136,21 @@ impl Interp {
                     let (arg1, arg2) = (self.pop_number(), self.pop_number());
                     self.push(StackVal::Number(arg1 + arg2));
                     self.pc += 1;
-                },
+                }
                 &Instr::Sub => {
                     let (arg1, arg2) = (self.pop_number(), self.pop_number());
                     self.push(StackVal::Number(arg1 - arg2));
                     self.pc += 1;
-                },
+                }
                 &Instr::Print => {
                     let arg = self.pop_number();
                     println!("{}", arg);
                     self.pc += 1;
-                },
+                }
                 &Instr::Pop => {
                     let _ = self.pop();
                     self.pc += 1;
-                },
+                }
                 _ => Self::fatal("Not implemented"),
             }
         }
@@ -162,7 +163,7 @@ enum Instr {
     Pop,
     Add,
     Sub,
-    JumpEqual(RawNumber, LabelName),  // jump to .1 if top of stack == .0
+    JumpEqual(RawNumber, LabelName), // jump to .1 if top of stack == .0
     Print,
 }
 
