@@ -12,7 +12,7 @@ type LabelName = String;
 struct Interp {
     program: Program,
     labels: LabelMap,
-    stack: Vec<StackVal>,
+    stack: Stack,
     pc: usize,
 }
 
@@ -22,7 +22,7 @@ impl Interp {
         Self {
             program: program,
             labels: labels,
-            stack: vec![],
+            stack: Stack::new(),
             pc: 0,
         }
     }
@@ -116,72 +116,49 @@ impl Interp {
         rv
     }
 
-    fn push(&mut self, val: StackVal) {
-        self.stack.push(val);
-    }
-
-    fn pop(&mut self) -> StackVal {
-        let val = self.stack.pop();
-        if val.is_none() {
-            Self::fatal("stack underflow");
-        }
-        val.unwrap()
-    }
-
-    fn pop_number(&mut self) -> RawNumber {
-        let item = self.pop();
-        let rv = match item {
-            StackVal::Number(val) => val,
-        };
-        rv
-    }
-
     fn run(&mut self) {
         // main interpreter loop
         loop {
-            let instr = {
-                let instr = self.program.get(self.pc);
-                if instr.is_none() {
-                    return; // end of program
-                }
-                instr.unwrap().clone()
-            };
+            let instr = self.program.get(self.pc);
+            if instr.is_none() {
+                return; // end of program
+            }
 
-            match instr {
-                Instr::Push(val) => {
-                    self.push(val.clone());
+            match instr.unwrap() {
+                &Instr::Push(ref val) => {
+                    self.stack.push(val.clone());
                     self.pc += 1;
                 }
-                Instr::Add => {
-                    let (arg1, arg2) = (self.pop_number(), self.pop_number());
-                    self.push(StackVal::Number(arg1 + arg2));
+                &Instr::Add => {
+                    let (arg1, arg2) = (self.stack.pop_number(), self.stack.pop_number());
+                    self.stack.push(StackVal::Number(arg1 + arg2));
                     self.pc += 1;
                 }
-                Instr::Dup => {
-                    let val = self.pop();
-                    self.push(val.clone());
-                    self.push(val);
+                &Instr::Dup => {
+                    let val = self.stack.pop();
+                    self.stack.push(val.clone());
+                    self.stack.push(val);
                     self.pc += 1;
                 }
-                Instr::Sub => {
-                    let (arg1, arg2) = (self.pop_number(), self.pop_number());
-                    self.push(StackVal::Number(arg2 - arg1));
+                &Instr::Sub => {
+                    let (arg1, arg2) = (self.stack.pop_number(), self.stack.pop_number());
+                    self.stack.push(StackVal::Number(arg2 - arg1));
                     self.pc += 1;
                 }
-                Instr::Print => {
-                    let arg = self.pop_number();
+                &Instr::Print => {
+                    let arg = self.stack.pop_number();
                     println!("{}", arg);
                     self.pc += 1;
                 }
-                Instr::Pop => {
-                    let _ = self.pop();
+                &Instr::Pop => {
+                    let _ = self.stack.pop();
                     self.pc += 1;
                 }
                 // XXX generalise binary operations to reduce duplication
-                Instr::JumpNotEqual(cmp_val, label) => {
-                    let val = self.pop_number();
-                    if val != cmp_val {
-                        if let Some(addr) = self.labels.get(&label) {
+                &Instr::JumpNotEqual(ref cmp_val, ref label) => {
+                    let val = self.stack.pop_number();
+                    if val != *cmp_val {
+                        if let Some(addr) = self.labels.get(label) {
                             self.pc = *addr;
                         } else {
                             Self::fatal("undefined label");
@@ -190,10 +167,10 @@ impl Interp {
                         self.pc += 1;
                     }
                 }
-                Instr::JumpEqual(cmp_val, label) => {
-                    let val = self.pop_number();
-                    if val == cmp_val {
-                        if let Some(addr) = self.labels.get(&label) {
+                &Instr::JumpEqual(ref cmp_val, ref label) => {
+                    let val = self.stack.pop_number();
+                    if val == *cmp_val {
+                        if let Some(addr) = self.labels.get(label) {
                             self.pc = *addr;
                         } else {
                             Self::fatal("undefined label");
@@ -228,6 +205,36 @@ enum ParsedLine {
 #[derive(Clone)]
 enum StackVal {
     Number(RawNumber),
+}
+
+struct Stack {
+    stack: Vec<StackVal>,
+}
+
+impl Stack {
+    fn new() -> Self {
+        Stack { stack: vec![] }
+    }
+
+    fn push(&mut self, val: StackVal) {
+        self.stack.push(val);
+    }
+
+    fn pop(&mut self) -> StackVal {
+        let val = self.stack.pop();
+        if val.is_none() {
+            Interp::fatal("stack underflow");
+        }
+        val.unwrap()
+    }
+
+    fn pop_number(&mut self) -> RawNumber {
+        let item = self.pop();
+        let rv = match item {
+            StackVal::Number(val) => val,
+        };
+        rv
+    }
 }
 
 fn main() {
