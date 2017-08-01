@@ -1,8 +1,9 @@
+#![feature(metarust)]
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::process::exit;
-use std::env;
+use std::{env, jit_merge_point};
 
 type Program = Vec<Instr>;
 type LabelMap = HashMap<String, usize>;
@@ -119,6 +120,7 @@ impl Interp {
     fn run(&mut self) {
         // main interpreter loop
         loop {
+            jit_merge_point(self.pc);
             let instr = self.program.get(self.pc);
             if instr.is_none() {
                 return; // end of program
