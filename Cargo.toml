@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Edd Barrett <vext01@gmail.com>"]
 
 [lib]
-name = "libsrsi"
+name = "srsi"
 crate-type = ["rlib"]
 
 [[bin]]

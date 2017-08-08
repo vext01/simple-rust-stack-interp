@@ -1,9 +1,11 @@
 #![feature(metarust)]
+extern crate metarust;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::process::exit;
-use std::jit_merge_point;
+use metarust::jit_merge_point;
 
 type Program = Vec<Instr>;
 type LabelMap = HashMap<String, usize>;
