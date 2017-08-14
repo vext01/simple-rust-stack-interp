@@ -1,11 +1,12 @@
-#![feature(metarust)]
-extern crate metarust;
+extern crate metarust; // XXX inject automatically in the compiler somehow.
+extern crate some_dep;
 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::process::exit;
 use metarust::jit_merge_point;
+use some_dep::test_func;
 
 type Program = Vec<Instr>;
 type LabelMap = HashMap<String, usize>;
@@ -118,6 +119,7 @@ impl Interp {
         // main interpreter loop
         loop {
             jit_merge_point(self.pc);
+            test_func();
             let instr = self.program.get(self.pc);
             if instr.is_none() {
                 return; // end of program

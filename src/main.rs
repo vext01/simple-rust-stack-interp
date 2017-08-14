@@ -1,5 +1,5 @@
-extern crate srsi;
-use srsi::{Interp, fatal};
+extern crate interp;
+use interp::{Interp, fatal};
 use std::env;
 
 fn main() {

@@ -1,0 +1,11 @@
+[package]
+name = "interp"
+version = "0.1.0"
+authors = ["Edd Barrett <vext01@gmail.com>"]
+
+[lib]
+name = "interp"
+crate-type = ["rlib"]
+
+[dependencies]
+some_dep = { path = "../some_dep" }
