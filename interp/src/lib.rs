@@ -1,12 +1,12 @@
-extern crate metarust; // XXX inject automatically in the compiler somehow.
+extern crate yorickrt;
 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::process::exit;
-use metarust::jit_merge_point;
+use yorickrt::{MetaTracer, Location};
 
-type Program = Vec<Instr>;
+type Program = Vec<(Instr, Location)>;
 type LabelMap = HashMap<String, usize>;
 type RawNumber = i32;
 type LabelName = String;
@@ -42,7 +42,7 @@ impl Interp {
         let mut labels = LabelMap::new();
         for line in reader.lines() {
             match Self::parse_line(line.unwrap()) {
-                ParsedLine::Instr(instr) => program.push(instr),
+                ParsedLine::Instr(instr) => program.push((instr, Location::new())),
                 ParsedLine::Label(label) => {
                     if labels.insert(label, program.len()).is_some() {
                         fatal("parse error: duplicate label");
@@ -113,17 +113,18 @@ impl Interp {
         rv
     }
 
+    // main interpreter loop
     pub fn run(&mut self) {
-        // main interpreter loop
+        let mut tracer = MetaTracer::new();
         loop {
-            jit_merge_point(self.pc);
-            test_func();
-            let instr = self.program.get(self.pc);
-            if instr.is_none() {
-                return; // end of program
-            }
+            eprintln!("pc={}", self.pc);
+            let (instr, loc) = match self.program.get(self.pc) {
+                None => break, // end of program.
+                Some(tup) => tup,
+            };
+            tracer.control_point(loc);
 
-            match instr.unwrap() {
+            match instr {
                 &Instr::Push(ref val) => {
                     self.stack.push(val.clone());
                     self.pc += 1;
