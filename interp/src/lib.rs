@@ -115,7 +115,7 @@ impl Interp {
 
     // main interpreter loop
     pub fn run(&mut self) {
-        let mut tracer = MetaTracer::new();
+        let tracer = MetaTracer::new();
         loop {
             eprintln!("pc={}", self.pc);
             let (instr, loc) = match self.program.get(self.pc) {
