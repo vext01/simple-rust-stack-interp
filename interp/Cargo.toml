@@ -9,3 +9,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 yorickrt = { git = "https://github.com/softdevteam/yorickrt" }
+hwtracer = { git = "https://github.com/softdevteam/hwtracer" }

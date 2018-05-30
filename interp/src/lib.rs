@@ -1,10 +1,12 @@
 extern crate yorickrt;
+extern crate hwtracer;
 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::process::exit;
 use yorickrt::{MetaTracer, Location};
+use hwtracer::backends::TracerBuilder;
 
 type Program = Vec<(Instr, Location)>;
 type LabelMap = HashMap<String, usize>;
@@ -115,14 +117,14 @@ impl Interp {
 
     // main interpreter loop
     pub fn run(&mut self) {
-        let tracer = MetaTracer::new();
+        let tracer = TracerBuilder::new().build().unwrap();
+        let mt = MetaTracer::new(tracer);
         loop {
-            eprintln!("pc={}", self.pc);
             let (instr, loc) = match self.program.get(self.pc) {
                 None => break, // end of program.
                 Some(tup) => tup,
             };
-            tracer.control_point(loc);
+            mt.control_point(loc);
 
             match instr {
                 &Instr::Push(ref val) => {
